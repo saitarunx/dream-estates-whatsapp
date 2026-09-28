@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dream Estates – Connect WhatsApp</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #1c1e21; }
+  button { background: #1877f2; color: #fff; border: 0; border-radius: 6px; padding: 12px 20px; font-size: 16px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  pre { background: #f0f2f5; padding: 12px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: 13px; }
+  .ok { color: #1a7f37; font-weight: 600; }
+  .err { color: #c62828; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Connect WhatsApp Business app</h1>
+<p>Links the number already running in the WhatsApp Business app to the <b>Plots Messaging</b> Cloud API app (coexistence). Keep the phone with the WhatsApp Business app nearby: you'll scan a QR code from it.</p>
+<button id="go" disabled>Loading Facebook SDK…</button>
+<p id="status"></p>
+<h3>Session info</h3>
+<pre id="session">(appears after you finish the flow)</pre>
+<h3>Login response</h3>
+<pre id="login">(appears after you finish the flow)</pre>
+
+<script>
+  const APP_ID = '1759389191997514';
+  const CONFIG_ID = '1628641051976054';
+  const GRAPH_VERSION = 'v23.0';
+
+  const $ = (id) => document.getElementById(id);
+
+  // Embedded Signup reports the WABA ID / phone number ID (or where the user dropped off) via postMessage.
+  window.addEventListener('message', (event) => {
+    if (!/facebook\.com$/.test(new URL(event.origin).hostname)) return;
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type !== 'WA_EMBEDDED_SIGNUP') return;
+      $('session').textContent = JSON.stringify(data, null, 2);
+      if (data.event === 'FINISH' || data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
+        $('status').innerHTML = '<span class="ok">Done. Copy the Session info above back to Claude.</span>';
+      } else if (data.event === 'CANCEL') {
+        $('status').innerHTML = '<span class="err">Flow cancelled at step: ' + (data.data && data.data.current_step) + '</span>';
+      } else if (data.event === 'ERROR') {
+        $('status').innerHTML = '<span class="err">Error: ' + (data.data && data.data.error_message) + '</span>';
+      }
+    } catch (_) { /* non-JSON messages from the SDK */ }
+  });
+
+  window.fbAsyncInit = function () {
+    FB.init({ appId: APP_ID, autoLogAppEvents: true, xfbml: false, version: GRAPH_VERSION });
+    $('go').disabled = false;
+    $('go').textContent = 'Connect WhatsApp Business app';
+  };
+
+  $('go').addEventListener('click', () => {
+    $('status').textContent = 'Popup open – follow the steps there…';
+    FB.login((response) => {
+      // The code is short-lived (30s); we only display whether we got one.
+      const r = response.authResponse || {};
+      $('login').textContent = JSON.stringify({ status: response.status, got_code: !!r.code }, null, 2);
+    }, {
+      config_id: CONFIG_ID,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: 'whatsapp_business_app_onboarding',
+        sessionInfoVersion: '3'
+      }
+    });
+  });
+</script>
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+</body>
+</html>
